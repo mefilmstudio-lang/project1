@@ -1,11 +1,6 @@
 // Jenkinsfile
 pipeline {
-    agent {
-        dockerContainer {
-            image 'docker:dind' 
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     environment {
         // Replace with your Docker Hub username
@@ -21,7 +16,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out the code...'
-                // This step is automatic if you configure your job to use SCM
                 checkout scm
             }
         }
@@ -29,16 +23,12 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building the application...'
-                // Example build command (e.g., for a Node.js app)
-                // sh 'npm install'
             }
         }
 
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                // Example test command
-                // sh 'npm test'
             }
         }
 
@@ -46,14 +36,9 @@ pipeline {
             steps {
                 echo "Building Docker image: ${IMAGE_TAG}"
                 script {
-                    // Build the Docker image from the Dockerfile
-                    sh "docker build -t ${IMAGE_TAG} ."
-                    
-                    // Use withCredentials to securely handle Docker Hub login
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
-                        echo "Pushing Docker image to Docker Hub..."
-                        sh "docker push ${IMAGE_TAG}"
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        def app = docker.build("${IMAGE_TAG}")
+                        app.push()
                     }
                 }
             }
@@ -62,7 +47,6 @@ pipeline {
         stage('Deploy via SSH') {
             steps {
                 echo "Deploying container to Azure worker node..."
-                // Use the SSH credential you created earlier
                 sshagent(['azure-ssh-key']) {
                     sh """
                     // Put the public IP address of your Azure worker node here
