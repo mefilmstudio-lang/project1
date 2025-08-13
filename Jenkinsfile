@@ -1,6 +1,13 @@
 // Jenkinsfile
 pipeline {
-    agent any
+    agent {
+        docker {
+            // This image includes the Docker CLI and a daemon
+            image 'docker:dind' 
+            // This line mounts the host's Docker socket, allowing the container to run Docker commands
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
         // Replace with your Docker Hub username
@@ -8,7 +15,7 @@ pipeline {
         // Create a unique tag for your image using the Jenkins build number
         IMAGE_NAME = "my-app"
         IMAGE_TAG = "${DOCKER_HUB_USERNAME}/${IMAGE_NAME}:${env.BUILD_NUMBER}"
-        DEPLOYMENT_NAME = "my-app-deployment"
+        // The name of your container on the remote server
         CONTAINER_NAME = "my-app-container"
     }
 
@@ -53,14 +60,25 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to Kubernetes') {
+        
+        stage('Deploy via SSH') {
             steps {
-                echo "Deploying new image to Kubernetes..."
-                // Use kubectl to update the deployment with the new image
-                // This command tells Kubernetes to update the 'my-app-container' in 'my-app-deployment'
-                // with the new image we just pushed.
-                sh "kubectl set image deployment/${DEPLOYMENT_NAME} ${CONTAINER_NAME}=${IMAGE_TAG}"
+                echo "Deploying container to Azure worker node..."
+                // Use the SSH credential you created earlier
+                sshagent(['azure-ssh-key']) {
+                    sh """
+                    // Put the public IP address of your Azure worker node here
+                    REMOTE_HOST="<your-worker-node-ip>" 
+
+                    # Stop and remove any existing container to prevent conflicts
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_HOST} "docker stop ${CONTAINER_NAME} || true"
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_HOST} "docker rm ${CONTAINER_NAME} || true"
+
+                    # Pull the new image and run a new container
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_HOST} "docker pull ${IMAGE_TAG}"
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_HOST} "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_TAG}"
+                    """
+                }
             }
         }
     }
