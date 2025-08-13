@@ -1,10 +1,8 @@
 // Jenkinsfile
 pipeline {
     agent {
-        docker {
-            // This image includes the Docker CLI and a daemon
+        dockerContainer {
             image 'docker:dind' 
-            // This line mounts the host's Docker socket, allowing the container to run Docker commands
             args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
