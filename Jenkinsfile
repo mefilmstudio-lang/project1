@@ -1,6 +1,13 @@
 // Jenkinsfile
 pipeline {
-    agent any
+    agent {
+        docker {
+            // This image includes the Docker CLI and a daemon
+            image 'docker:dind' 
+            // This mounts the Docker socket from the host to the container
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
         // Replace with your Docker Hub username
@@ -36,9 +43,11 @@ pipeline {
             steps {
                 echo "Building Docker image: ${IMAGE_TAG}"
                 script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
-                        def app = docker.build("${IMAGE_TAG}")
-                        app.push()
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                        sh "docker build -t ${IMAGE_TAG} ."
+                        echo "Pushing Docker image to Docker Hub..."
+                        sh "docker push ${IMAGE_TAG}"
                     }
                 }
             }
