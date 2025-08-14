@@ -1,7 +1,13 @@
 // Jenkinsfile
 pipeline {
-    // We use a general agent for the entire pipeline.
-    agent any
+    // This is the standard and correct way to use a Docker agent.
+    // It requires the "Pipeline: Docker" plugin to be installed.
+    agent {
+        docker {
+            image 'docker:dind'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
         // Your correct Docker Hub username
@@ -22,21 +28,13 @@ pipeline {
         }
 
         stage('Build and Push Docker Image') {
-            // This time, we don't use a specific agent for the stage.
-            // Instead, we use a tool-specific block to run the Docker commands.
             steps {
-                // This block runs all the steps inside a 'docker:dind' container.
-                // The withDockerContainer step handles mounting the Docker socket.
-                // Make sure your Jenkins agent has the Docker CLI installed
-                // and access to the Docker daemon.
-                withDockerContainer(image: 'docker:dind', args: '-v /var/run/docker.sock:/var/run/docker.sock') {
-                    script {
-                        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                            sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
-                            sh "docker build -t ${IMAGE_TAG} ."
-                            echo "Pushing Docker image to Docker Hub..."
-                            sh "docker push ${IMAGE_TAG}"
-                        }
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                        sh "docker build -t ${IMAGE_TAG} ."
+                        echo "Pushing Docker image to Docker Hub..."
+                        sh "docker push ${IMAGE_TAG}"
                     }
                 }
             }
