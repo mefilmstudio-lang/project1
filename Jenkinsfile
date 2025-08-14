@@ -1,11 +1,6 @@
 // Jenkinsfile
 pipeline {
-    agent {
-        docker {
-            image 'docker:dind'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
 
     environment {
         // Replace with your Docker Hub username
@@ -25,21 +20,14 @@ pipeline {
             }
         }
 
-        stage('Build') {
-            steps {
-                echo 'Building the application...'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo 'Running tests...'
-            }
-        }
-
         stage('Build and Push Docker Image') {
+            agent {
+                docker { 
+                    image 'docker:dind'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
-                echo "Building Docker image: ${IMAGE_TAG}"
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
@@ -52,6 +40,7 @@ pipeline {
         }
         
         stage('Deploy via SSH') {
+            agent any
             steps {
                 echo "Deploying container to Azure worker node..."
                 sshagent(['azure-ssh-key']) {
