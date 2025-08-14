@@ -1,11 +1,12 @@
 // Jenkinsfile
 pipeline {
     agent {
-    dockerContainer {
-        image 'docker:dind'
-        args '-v /var/run/docker.sock:/var/run/docker.sock'
+        dockerContainer {
+            image 'docker:dind'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
     }
-}
+
     environment {
         // Replace with your Docker Hub username
         DOCKER_HUB_USERNAME = 'your-dockerhub-username'
