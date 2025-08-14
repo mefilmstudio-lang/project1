@@ -1,10 +1,15 @@
 // Jenkinsfile
 pipeline {
-    // This is the standard and correct way to use a Docker agent.
-    // It requires the "Pipeline: Docker" plugin to be installed.
+    // We are now correctly using the `docker` agent type.
+    // This tells Jenkins to run the entire pipeline inside a container
+    // spawned from the specified image, which should resolve the
+    // "docker: not found" error by providing the necessary environment.
     agent {
         docker {
             image 'docker:dind'
+            // The `args` parameter is now valid here and can be used for things like
+            // mounting the host's Docker socket, although it may not be necessary
+            // since we are using a dind image.
             args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
