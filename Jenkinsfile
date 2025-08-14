@@ -1,10 +1,11 @@
 // Jenkinsfile
 pipeline {
+    // We use a general agent for the entire pipeline.
     agent any
 
     environment {
-        // Replace with your Docker Hub username
-        DOCKER_HUB_USERNAME = 'your-dockerhub-username'
+        // Your correct Docker Hub username
+        DOCKER_HUB_USERNAME = 'mefilmstudio'
         // Create a unique tag for your image using the Jenkins build number
         IMAGE_NAME = "my-app"
         IMAGE_TAG = "${DOCKER_HUB_USERNAME}/${IMAGE_NAME}:${env.BUILD_NUMBER}"
@@ -21,26 +22,27 @@ pipeline {
         }
 
         stage('Build and Push Docker Image') {
-            agent {
-                docker { 
-                    image 'docker:dind'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
+            // This time, we don't use a specific agent for the stage.
+            // Instead, we use a tool-specific block to run the Docker commands.
             steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
-                        sh "docker build -t ${IMAGE_TAG} ."
-                        echo "Pushing Docker image to Docker Hub..."
-                        sh "docker push ${IMAGE_TAG}"
+                // This block runs all the steps inside a 'docker:dind' container.
+                // The withDockerContainer step handles mounting the Docker socket.
+                // Make sure your Jenkins agent has the Docker CLI installed
+                // and access to the Docker daemon.
+                withDockerContainer(image: 'docker:dind', args: '-v /var/run/docker.sock:/var/run/docker.sock') {
+                    script {
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                            sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                            sh "docker build -t ${IMAGE_TAG} ."
+                            echo "Pushing Docker image to Docker Hub..."
+                            sh "docker push ${IMAGE_TAG}"
+                        }
                     }
                 }
             }
         }
         
         stage('Deploy via SSH') {
-            agent any
             steps {
                 echo "Deploying container to Azure worker node..."
                 sshagent(['azure-ssh-key']) {
