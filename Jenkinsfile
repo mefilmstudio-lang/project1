@@ -1,16 +1,32 @@
-// Jenkinsfile
+// Jenkinsfile for a containerd/Kubernetes environment
 pipeline {
-    // We are now correctly using the `docker` agent type.
-    // This tells Jenkins to run the entire pipeline inside a container
-    // spawned from the specified image, which should resolve the
-    // "docker: not found" error by providing the necessary environment.
+    // We are now using a Kubernetes agent.
+    // This will instruct the Jenkins Kubernetes plugin to
+    // dynamically create a Pod to run the pipeline.
     agent {
-        docker {
-            image 'docker:dind'
-            // The `args` parameter is now valid here and can be used for things like
-            // mounting the host's Docker socket, although it may not be necessary
-            // since we are using a dind image.
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        kubernetes {
+            // Define a Pod that has the tools we need for our pipeline.
+            // This Pod will have a 'docker:dind' container inside it,
+            // which provides the Docker daemon and CLI for our build.
+            defaultContainer 'build-container'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: build-container
+    image: docker:dind
+    command: ['cat']
+    tty: true
+    # This is a key part: we mount an empty directory as a volume
+    # for the Docker daemon's storage, ensuring it works correctly.
+    volumeMounts:
+    - name: docker-graph-storage
+      mountPath: /var/lib/docker
+  volumes:
+  - name: docker-graph-storage
+    emptyDir: {}
+'''
         }
     }
 
@@ -34,7 +50,9 @@ pipeline {
 
         stage('Build and Push Docker Image') {
             steps {
-                script {
+                // The build-container from the Kubernetes agent definition
+                // now has the `docker` command available.
+                container('build-container') {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                         sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
                         sh "docker build -t ${IMAGE_TAG} ."
